@@ -208,7 +208,7 @@ class paypalhss extends base {
 			'L_BUTTONVAR22'=>"billing_country=".$order->billing['country']['iso_code_2'],
 			'L_BUTTONVAR23'=>"billing_state=".$order->billing['state'],
 			'L_BUTTONVAR24'=>"billing_zip=".$order->billing['postcode'],
-			'L_BUTTONVAR25'=>"buyer_email=".$order->billing['email_address'],
+			'L_BUTTONVAR25'=>"buyer_email=".$order->customer['email_address'],
 			'L_BUTTONVAR26'=>"notify_url=".html_entity_decode(zen_href_link('ipn_hss_handler.php', '', 'SSL',false,false,true)),
 			'L_BUTTONVAR27'=>"showHostedThankyouPage=false",
 			'L_BUTTONVAR28'=>"invoice=".(int)$_SESSION['customer_id'] . '-' . time() . '-[' . substr(preg_replace('/[^a-zA-Z0-9_]/', '', STORE_NAME), 0, 30) . ']',
