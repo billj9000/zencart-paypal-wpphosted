@@ -329,18 +329,65 @@ class paypalhss extends base {
 	curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 
 	$apiresponse = curl_exec($ch);
-	$str = parse_str($apiresponse, $output);
+	$str = parse_str($apiresponse, $response);
 	curl_close($ch);
 
-    //Check if the transaction has already been compelted
+      $this->payment_type = MODULE_PAYMENT_PAYPALHSS_TEXT_TYPE;
+      $this->responsedata = $response;
+      if ($this->responsedata['PAYMENTTYPE'] != '') $this->payment_type .=  ' (' . urldecode($this->responsedata['PAYMENTTYPE']) . ')';
+
+      $this->transaction_id = trim($this->responsedata['PNREF'] . ' ' . $this->responsedata['TRANSACTIONID']);
+      if (empty($this->responsedata['PENDINGREASON']) ||
+          $this->responsedata['PENDINGREASON'] == 'none' ||
+          $this->responsedata['PENDINGREASON'] == 'completed' ||
+          $this->responsedata['PAYMENTSTATUS'] == 'Completed') {
+        $this->payment_status = 'Completed';
+        if ($this->order_status > 0) $order->info['order_status'] = $this->order_status;
+      } else {
+        if ($this->responsedata['PAYMENTSTATUS'] == 'Pending')
+        {
+          if ($this->responsedata['L_ERRORCODE0'] == 11610 && $this->responsedata['PENDINGREASON'] == '') $this->responsedata['PENDINGREASON'] = 'Pending FMF Review by Storeowner';
+        }
+        $this->payment_status = 'Pending (' . $this->responsedata['PENDINGREASON'] . ')';
+        $order->info['order_status'] = $this->order_pending_status;
+      }
+      $this->avs = 'N/A';
+      $this->cvv2 = 'N/A';
+      $this->correlationid = $this->responsedata['CORRELATIONID'];
+      $this->transactiontype = $this->responsedata['TRANSACTIONTYPE'];
+      $this->payment_time = urldecode($this->responsedata['ORDERTIME']);
+      $this->feeamt = urldecode($this->responsedata['FEEAMT']);
+      $this->taxamt = urldecode($this->responsedata['TAXAMT']);
+      $this->pendingreason = $this->responsedata['PENDINGREASON'];
+      $this->reasoncode = $this->responsedata['REASONCODE'];
+      $this->numitems =  $_SESSION['cart']->count_contents();
+      $this->amt = urldecode($this->responsedata['AMT'] . ' ' . $this->responsedata['CURRENCYCODE']);
+      $this->auth_code = (isset($this->response['AUTHCODE'])) ? $this->response['AUTHCODE'] : $this->response['TOKEN'];
+      $this->hss_shiptoname = $this->responsedata['SHIPTONAME'];
+      $this->hss_shiptostreet = $this->responsedata['SHIPTOSTREET'];
+      $this->hss_shiptocity = $this->responsedata['SHIPTOCITY'];
+      $this->hss_shiptostate = $this->responsedata['SHIPTOSTATE'];
+      $this->hss_shiptopostalcode = $this->responsedata['SHIPTOZIP'];
+      $this->hss_shiptocountry = $this->responsedata['SHIPTOCOUNTRYCODE'];
+      $this->hss_shiptoaddress_status = $this->responsedata['ADDRESSSTATUS'];
+      $this->hss_payerfirstname = $this->responsedata['FIRSTNAME'];
+      $this->hss_payerlastname = $this->responsedata['LASTNAME'];
+      $this->hss_payerbusiness = $this->responsedata['BUSINESS'];
+      $this->hss_payeremail = $this->responsedata['EMAIL'];
+      $this->hss_payerid = $this->responsedata['PAYERID'];
+      $this->hss_payerstatus = $this->responsedata['PAYERSTATUS'];
+      // send the store name as transaction identifier, to help distinguish payments between multiple stores:
+      $this->hss_invoice = (int)$_SESSION['customer_id'] . '-' . time() . '-[' . substr(preg_replace('/[^a-zA-Z0-9_]/', '', STORE_NAME), 0, 30) . ']';  // (cannot send actual invoice number because it's not assigned until after payment is completed)
+ 
+    //Check if the transaction has already been completed
     $sql = "SELECT 1 FROM " . TABLE_PAYPAL . " WHERE txn_id = :transactionID";
-    $checkTxnID = $db->bindVars($sql, ':transactionID', $output['TRANSACTIONID'], 'string');
+    $checkTxnID = $db->bindVars($sql, ':transactionID', $this->responsedata['TRANSACTIONID'], 'string');
     $result = $db->Execute($checkTxnID);
 
-    if($result->RecordCount() > 0) 
+    if($result->RecordCount() > 0)
 	zen_redirect(zen_href_link(FILENAME_CHECKOUT_SUCCESS, '', 'SSL'));
-	
-     if ($output['PAYMENTSTATUS'] == 'Completed' || $output['PAYMENTSTATUS'] == 'In-Progress' || $output['PAYMENTSTATUS'] == 'Pending' || $output['PAYMENTSTATUS'] == 'Processed') {
+
+     if ($this->responsedata['PAYMENTSTATUS'] == 'Completed' || $this->responsedata['PAYMENTSTATUS'] == 'In-Progress' || $this->responsedata['PAYMENTSTATUS'] == 'Pending' || $this->responsedata['PAYMENTSTATUS'] == 'Processed') {
 		return false;
       } else {
 	// payment failed so head back to payment page
@@ -373,8 +420,50 @@ class paypalhss extends base {
   }
 
   function after_process() {
-  	$_SESSION['order_created'] = '';
-	return false;
+    global $insert_id;
+
+    // store the PayPal order meta data -- used for later matching and back-end processing activities
+    $paypal_order = array('order_id' => $insert_id,
+                          'txn_type' => $this->transactiontype,
+                          'module_name' => $this->code,
+                          'module_mode' => MODULE_PAYMENT_PAYPALHSS_MODULE_MODE,
+                          'reason_code' => $this->reasoncode,
+                          'payment_type' => $this->payment_type,
+                          'payment_status' => $this->payment_status,
+                          'pending_reason' => $this->pendingreason,
+                          'invoice' => $this->hss_invoice,
+                          'first_name' => $this->hss_payerfirstname,
+                          'last_name' => $this->hss_payerlastname,
+                          'payer_business_name' => $this->hss_payerbusiness,
+                          'address_name' => $this->hss_shiptoname,
+                          'address_street' => $this->hss_shiptostreet,
+                          'address_city' => $this->hss_shiptocity,
+                          'address_state' => $this->hss_shiptostate,
+                          'address_zip' => $this->hss_shiptopostalcode,
+                          'address_country' => $this->hss_shiptocountry,
+                          'address_status' => $this->hss_shiptoaddress_status,
+                          'payer_email' => $this->hss_payeremail,
+                          'payer_id' => $this->hss_payerid,
+                          'payer_status' => $this->hss_payerstatus,
+                          'payment_date' => trim(preg_replace('/[^0-9-:]/', ' ', $this->payment_time)),
+                          'business' => '',
+                          'receiver_email' => (substr(MODULE_PAYMENT_PAYPALWPP_MODULE_MODE,0,7) == 'Payflow' ? MODULE_PAYMENT_PAYPALHSS_PFVENDOR : str_replace('_api1', '', MODULE_PAYMENT_PAYPALHSS_APIUSERNAME)),
+                          'receiver_id' => '',
+                          'txn_id' => $this->transaction_id,
+                          'parent_txn_id' => '',
+                          'num_cart_items' => $this->numitems,
+                          'mc_gross' => (float)$this->amt,
+                          'mc_fee' => (float)urldecode($this->feeamt),
+                          'mc_currency' => $this->responsedata['CURRENCYCODE'],
+                          'settle_amount' => (float)urldecode($this->responsedata['SETTLEAMT']),
+                          'settle_currency' => $this->responsedata['CURRENCYCODE'],
+                          'exchange_rate' => (urldecode($this->responsedata['EXCHANGERATE']) > 0 ? urldecode($this->responsedata['EXCHANGERATE']) : 1.0),
+                          'notify_version' => '0',
+                          'verify_sign' =>'',
+                          'date_added' => 'now()',
+                          'memo' => (sizeof($this->fmfErrors) > 0 ? 'FMF Details ' . print_r($this->fmfErrors, TRUE) : '{Record generated by payment module}'),
+                         );
+    zen_db_perform(TABLE_PAYPAL, $paypal_order);
   }
 
   function output_error() {

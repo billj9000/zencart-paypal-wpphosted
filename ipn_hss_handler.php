@@ -106,7 +106,7 @@
   $txn_type    = $lookupData['txn_type'];
   $parentLookup = $txn_type;
 
-  ipn_debug_email('Breakpoint: 4 - ' . 'Details:  txn_type=' . $txn_type . '    ordersID = '. $ordersID . '  IPN_id=' . $paypalipnID . "\n\n" . '   Relevant data from POST:' . "\n     " . 'txn_type = ' . $txn_type . "\n     " . 'parent_txn_id = ' . ($_POST['parent_txn_id'] =='' ? 'None' : $_POST['parent_txn_id']) . "\n     " . 'txn_id = ' . $_POST['txn_id']);
+  ipn_debug_email('Breakpoint: 4 - ' . 'Details:  txn_type=' . $txn_type . '    ordersID = '. $ordersID . '  IPN_id=' . $paypalipnID . "\n\n" . '   Relevant data from POST:' . "\n     " . 'txn_type = ' . $txn_type . "\n     " . 'parent_txn_id = ' . ($_POST['parent_txn_id'] =='' ? 'None' : $_POST['parent_txn_id']) . "\n     " . 'txn_id = ' . $_POST['txn_id']. "\n     " ."zen_id=".str_replace('zenid=', '', $_POST['custom']));
 
   if (!$isECtransaction && !isset($_POST['parent_txn_id']) && $txn_type != 'cleared-echeck') {
     if (defined('MODULE_PAYMENT_PAYPAL_PDTTOKEN') && MODULE_PAYMENT_PAYPAL_PDTTOKEN != '') {
@@ -200,8 +200,6 @@
     case (substr($txn_type,0,8) == 'pending-' && (int)$ordersID <= 0):
     case ($new_record_needed && $txn_type == 'echeck-cleared'):
     case 'unique':
-    case 'web_accept':
-    case 'pro_hosted':
       /**
        * delete IPN session from PayPal table -- housekeeping
        */
@@ -316,6 +314,8 @@
     case 'denied':
     case 'voided':
     case 'express-checkout-cleared':
+    case 'web_accept':
+    case 'pro_hosted':
       ipn_debug_email('IPN NOTICE :: Storing order/update details for order #' . $ordersID . ' txn_id: ' . $_POST['txn_id'] . ' PP IPN ID: ' . $paypalipnID);
       if ($txn_type == 'parent') {
         $sql_data_array = ipn_create_order_array($ordersID, $txn_type);

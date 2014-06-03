@@ -14,7 +14,7 @@
     define('MODULE_PAYMENT_PAYPALHSS_TEXT_DESCRIPTION', '<strong>PayPal</strong>');
   }
 
-  define('MODULE_PAYMENT_PAYPALHSS_TEXT_TYPE', 'PayPal Website Payments Pro Hosted');
+  define('MODULE_PAYMENT_PAYPALHSS_TEXT_TYPE', 'PayPal WP Pro Hosted');
   define('MODULE_PAYMENT_PAYPALHSS_SANDBOXACTIVE', 'sandbox active');
   define('MODULE_PAYMENT_PAYPALHSS_CHECKOUT_TITLE', 'Pay by Card');
   define('MODULE_PAYMENT_PAYPALHSS_STATUS', 'Enable PayPal Module');
@@ -69,7 +69,7 @@
   define('MODULE_PAYMENT_PAYPALHSS_ENTRY_COMMENTS', 'System Comments:');
   define('MODULE_PAYMENT_PAYPALHSS_PURCHASE_DESCRIPTION_TITLE', STORE_NAME . ' Purchase');
   define('MODULE_PAYMENT_PAYPALHSS_PURCHASE_DESCRIPTION_ITEMNUM', 'Store Receipt');
-
+  define('MODULE_PAYMENT_PAYPALHSS_MODULE_MODE', 'Credit/Debit card');
 
   // These are used for displaying raw transaction details in the Admin area:
   define('MODULE_PAYMENT_PAYPAL_ENTRY_FIRST_NAME', 'First Name:');
